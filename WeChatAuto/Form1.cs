@@ -206,7 +206,16 @@ namespace WeChatAuto
 
 
             wxWindow.FindAllDescendants().Where(s => s.Name == "通讯录")?.FirstOrDefault()?.Click(false);
+
+            wxWindow.FindAllDescendants().Where(s => s.ControlType == ControlType.List && s.Name == "联系人").FirstOrDefault()?
+                .Patterns.Scroll.Pattern.SetScrollPercent(0.0, 0.0);
+
+            Thread.Sleep(1000);
+
             wxWindow.FindAllDescendants().Where(s => s.Name == "新的朋友")?.FirstOrDefault()?.Click(false);
+
+
+
             string LastName = string.Empty;
             var list = new List<AutomationElement>();
             var sync = SynchronizationContext.Current;
@@ -765,6 +774,7 @@ namespace WeChatAuto
 
                         if (messageType == MessageType.TEXT || messageType == MessageType.ALL)
                         {
+                            //发文字===================================================
                             if (!string.IsNullOrWhiteSpace(this.richTextBox1.Text))
                             {
                                 Clipboard.SetText(this.richTextBox1.Text);
@@ -825,9 +835,8 @@ namespace WeChatAuto
                         MessageBox.Show("错误，没有找到微信！");
                     }
                 }
-                PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(cn_ZH, KLF_ACTIVATE));
                 MessageBox.Show("发送完成", "完成", MessageBoxButtons.OK, MessageBoxIcon.None, MessageBoxDefaultButton.Button1, MessageBoxOptions.ServiceNotification);
-                //MessageBox.Show("发送完成！",options: MessageBoxOptions.ServiceNotification);
+                PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(cn_ZH, KLF_ACTIVATE));
 
             }
             catch (Exception ex)
