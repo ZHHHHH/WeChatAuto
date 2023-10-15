@@ -6,11 +6,21 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using System;
 using System.Collections.Specialized;
+using Quartz.Impl;
+using Quartz;
+using Quartz.Impl.Matchers;
+using static WeChatAuto.Form1;
+using static System.Windows.Forms.ListBox;
+using static System.Net.Mime.MediaTypeNames;
+using System.Drawing;
+using System.Linq;
 
 namespace WeChatAuto
 {
-    public partial class Form1 : Form
+    [DisallowConcurrentExecution]
+    public partial class Form1 : Form, IJob
     {
+        private IScheduler scheduler;
         private List<dynamic> list = new List<dynamic>();
         private Dictionary<string, string> Content = new Dictionary<string, string>();
         /// <summary>
@@ -83,6 +93,10 @@ namespace WeChatAuto
             ChatListCancellationToken = ChatListTokenSource.Token;
             FriendTokenSource = new CancellationTokenSource();
             FriendCancellationToken = FriendTokenSource.Token;
+
+            //创建计划单元（时间轴，载体）
+            StdSchedulerFactory schedulerFactory = new StdSchedulerFactory();
+            scheduler = schedulerFactory.GetScheduler().Result;
         }
         private CancellationToken FriendCancellationToken { get; set; }
         private CancellationTokenSource FriendTokenSource { get; set; }
@@ -207,8 +221,12 @@ namespace WeChatAuto
 
             wxWindow.FindAllDescendants().Where(s => s.Name == "通讯录")?.FirstOrDefault()?.Click(false);
 
-            wxWindow.FindAllDescendants().Where(s => s.ControlType == ControlType.List && s.Name == "联系人").FirstOrDefault()?
-                .Patterns.Scroll.Pattern.SetScrollPercent(0.0, 0.0);
+
+            try {
+                wxWindow.FindAllDescendants().Where(s => s.ControlType == ControlType.List && s.Name == "联系人").FirstOrDefault()?
+                .Patterns?.Scroll?.Pattern?.SetScrollPercent(0.0, 0.0);
+            } catch { }
+            
 
             Thread.Sleep(1000);
 
@@ -435,7 +453,7 @@ namespace WeChatAuto
         private async void button3_Click(object sender, EventArgs e)
         {
             PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(en_US, KLF_ACTIVATE));
-            var sendMsg = richTextBox1.Text.Trim();
+            var sendMsg = "";
             var itemName = listBox1.SelectedItem?.ToString();
             if (!IsInit)
             {
@@ -584,140 +602,6 @@ namespace WeChatAuto
                     MessageBox.Show("请选择要发送的人或群");
                     return;
                 }
-                foreach (var receiver in this.listBox1.SelectedItems)
-                {
-                    IntPtr maindHwnd = FindWindow("WeChatMainWndForPC", null);
-                    if (maindHwnd != IntPtr.Zero)
-                    {
-                        ShowWindow(maindHwnd, 9);
-                        SetForegroundWindow(maindHwnd);
-                        SetFocus(maindHwnd);
-
-                        Rect lpRect;
-                        GetWindowRect(maindHwnd, out lpRect);
-                        int top_ = lpRect.Top + 50;
-                        int left_ = lpRect.Left + 160;
-                        SetCursorPos(left_, top_);
-
-                        mouse_event(0x0002, left_, top_, 0, 0);
-                        mouse_event(0x0004, left_, top_, 0, 0);
-                        System.Threading.Thread.Sleep(1000);
-
-                        // 清除搜索框===================================================
-                        //System.Windows.Forms.SendKeys.SendWait("^a");
-                        //System.Threading.Thread.Sleep(1000);
-                        //System.Windows.Forms.SendKeys.SendWait("^x");
-                        //System.Threading.Thread.Sleep(1000);
-
-                        //SetForegroundWindow(maindHwnd);
-                        //SetFocus(maindHwnd);
-                        //SetCursorPos(left_, top_);
-                        //mouse_event(0x0002, left_, top_, 0, 0);
-                        //mouse_event(0x0004, left_, top_, 0, 0);
-                        //System.Threading.Thread.Sleep(1000);
-
-                        //搜索群===================================================
-                        System.Windows.Forms.SendKeys.SendWait(receiver.ToString());
-                        System.Threading.Thread.Sleep(1000);
-                        System.Windows.Forms.SendKeys.SendWait("{ENTER}");
-
-                        Clipboard.Clear();
-
-                        ShowWindow(maindHwnd, 9);
-                        SetForegroundWindow(maindHwnd);
-                        SetFocus(maindHwnd);
-                        int top2_ = lpRect.Bottom - 108;
-                        int left2_ = lpRect.Left + 600;
-                        SetCursorPos(left2_, top2_);
-
-                        mouse_event(0x0002, left2_, top2_, 0, 0);
-                        mouse_event(0x0004, left2_, top2_, 0, 0);
-                        System.Threading.Thread.Sleep(1000);
-
-
-                        if (messageType == MessageType.TEXT || messageType == MessageType.ALL)
-                        {
-                            //发文字===================================================
-                            if (!string.IsNullOrWhiteSpace(this.richTextBox1.Text))
-                            {
-                                Clipboard.SetText(this.richTextBox1.Text);
-                                System.Threading.Thread.Sleep(1000);
-                                System.Windows.Forms.SendKeys.SendWait("^v");  //发送Ctrl+v 
-                                System.Threading.Thread.Sleep(1000);
-                                SendMessage(maindHwnd, 0x0100, 13, 0);  //回车
-                                System.Threading.Thread.Sleep(1000);
-                                Clipboard.Clear();
-                            }
-
-                            //===================================================
-                        }
-
-
-                        if (messageType == MessageType.IMAGE || messageType == MessageType.ALL)
-                        {
-                            //发图片===================================================
-                            foreach (var item in this.listBox2.Items)
-                            {
-                                var image = Image.FromFile(item.ToString());
-                                Clipboard.SetImage(image);
-                                System.Threading.Thread.Sleep(1000);
-                                System.Windows.Forms.SendKeys.SendWait("^v");
-                                System.Threading.Thread.Sleep(1000);
-                                SendMessage(maindHwnd, 0x0100, 13, 0);
-                                System.Threading.Thread.Sleep(1000);
-                                Clipboard.Clear();
-                            }
-
-                            //===================================================
-                        }
-
-                        if (messageType == MessageType.FILE || messageType == MessageType.ALL)
-                        {
-                            //发文件===================================================
-                            StringCollection stringCollection = new StringCollection();
-                            foreach (var item in this.listBox3.Items)
-                            {
-                                stringCollection.Add(item.ToString());
-                            }
-                            if (stringCollection.Count > 0)
-                            {
-                                Clipboard.SetFileDropList(stringCollection);
-                                System.Threading.Thread.Sleep(1000);
-                                System.Windows.Forms.SendKeys.SendWait("^v");
-                                System.Threading.Thread.Sleep(1000);
-                                SendMessage(maindHwnd, 0x0100, 13, 0);
-                                System.Threading.Thread.Sleep(1000);
-                                Clipboard.Clear();
-                            }
-
-                            //===================================================
-                        }
-                    }
-                    else
-                    {
-                        MessageBox.Show("错误，没有找到微信！");
-                    }
-                }
-                MessageBox.Show("发送完成", "完成", MessageBoxButtons.OK, MessageBoxIcon.None, MessageBoxDefaultButton.Button1, MessageBoxOptions.ServiceNotification);
-                //MessageBox.Show("发送完成！",options: MessageBoxOptions.ServiceNotification);
-
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-
-        public void SendMsg1(MessageType messageType)
-        {
-
-            try
-            {
-                if (this.listBox1.SelectedItems.Count == 0)
-                {
-                    MessageBox.Show("请选择要发送的人或群");
-                    return;
-                }
                 PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(en_US, KLF_ACTIVATE));
                 foreach (var receiver in this.listBox1.SelectedItems)
                 {
@@ -763,7 +647,7 @@ namespace WeChatAuto
                         System.Threading.Thread.Sleep(1000);
                         System.Windows.Forms.SendKeys.SendWait("{ENTER}");
                         Clipboard.Clear();
-                       
+
                         var button = wxWindow.FindAllDescendants().Where(s => s.Name == "发送(S)").FirstOrDefault();
                         if (button == null)
                         {
@@ -775,17 +659,19 @@ namespace WeChatAuto
                         if (messageType == MessageType.TEXT || messageType == MessageType.ALL)
                         {
                             //发文字===================================================
-                            if (!string.IsNullOrWhiteSpace(this.richTextBox1.Text))
+                            foreach (var item in this.listBox4.Items)
                             {
-                                Clipboard.SetText(this.richTextBox1.Text);
-                                System.Threading.Thread.Sleep(1000);
-                                System.Windows.Forms.SendKeys.SendWait("^v");  //发送Ctrl+v 
-                                System.Threading.Thread.Sleep(1000);
-                                SendMessage(maindHwnd, 0x0100, 13, 0);  //回车
-                                System.Threading.Thread.Sleep(1000);
-                                Clipboard.Clear();
+                                if (!string.IsNullOrWhiteSpace(item.ToString()))
+                                {
+                                    Clipboard.SetText(item.ToString());
+                                    System.Threading.Thread.Sleep(1000);
+                                    System.Windows.Forms.SendKeys.SendWait("^v");  //发送Ctrl+v 
+                                    System.Threading.Thread.Sleep(1000);
+                                    SendMessage(maindHwnd, 0x0100, 13, 0);  //回车
+                                    System.Threading.Thread.Sleep(1000);
+                                    Clipboard.Clear();
+                                }
                             }
-
                             //===================================================
                         }
 
@@ -795,7 +681,7 @@ namespace WeChatAuto
                             //发图片===================================================
                             foreach (var item in this.listBox2.Items)
                             {
-                                var image = Image.FromFile(item.ToString());
+                                var image = System.Drawing.Image.FromFile(item.ToString());
                                 Clipboard.SetImage(image);
                                 System.Threading.Thread.Sleep(1000);
                                 System.Windows.Forms.SendKeys.SendWait("^v");
@@ -847,22 +733,22 @@ namespace WeChatAuto
 
         private void button3_Click_1(object sender, EventArgs e)
         {
-            SendMsg1(MessageType.TEXT);
+            SendMsg(MessageType.TEXT);
         }
 
         private void button8_Click_1(object sender, EventArgs e)
         {
-            SendMsg1(MessageType.IMAGE);
+            SendMsg(MessageType.IMAGE);
         }
 
         private void button9_Click(object sender, EventArgs e)
         {
-            SendMsg1(MessageType.FILE);
+            SendMsg(MessageType.FILE);
         }
 
         private void button10_Click(object sender, EventArgs e)
         {
-            SendMsg1(MessageType.ALL);
+            SendMsg(MessageType.ALL);
         }
 
         private void showwxWindows()
@@ -875,5 +761,250 @@ namespace WeChatAuto
                 SetFocus(maindHwnd);
             }
         }
+
+        private void button15_Click(object sender, EventArgs e)
+        {
+            InputTxtMsg inputTxtMsg = new InputTxtMsg();
+            if (inputTxtMsg.ShowDialog() == DialogResult.OK)
+            {
+                this.listBox4.Items.Add(inputTxtMsg.richTextBox1.Text);
+            }
+        }
+
+        private void button17_Click(object sender, EventArgs e)
+        {
+            for (int i = listBox4.Items.Count - 1; i > -1; i--)
+            {
+                if (listBox4.GetSelected(i))
+                {
+                    listBox4.Items.RemoveAt(i);
+                }
+            }
+        }
+
+        private void button18_Click(object sender, EventArgs e)
+        {
+            if (this.listBox4.SelectedItem == null) return;
+            InputTxtMsg inputTxtMsg = new InputTxtMsg();
+            inputTxtMsg.richTextBox1.Text = this.listBox4.SelectedItem.ToString();
+            if (inputTxtMsg.ShowDialog() == DialogResult.OK)
+            {
+                this.listBox4.Items[this.listBox4.SelectedIndex] = inputTxtMsg.richTextBox1.Text;
+            }
+        }
+
+        private void button16_Click(object sender, EventArgs e)
+        {
+            if (this.listBox1.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("请选择要发送的人或群");
+                return;
+            }
+            if (this.listBox4.Items.Count == 0 && this.listBox2.Items.Count == 0 && this.listBox3.Items.Count == 0)
+            {
+                MessageBox.Show("请填写要发送的消息");
+                return;
+            }
+
+            InputTitle inputTitle = new InputTitle();
+            if (inputTitle.ShowDialog() == DialogResult.OK)
+            {
+                scheduler.Start();
+
+                //Trigger时间触发机制
+                var trigger = TriggerBuilder.Create()
+                    .WithIdentity("TestTrigger", "TestGroup")
+                     .WithCronSchedule(inputTitle.textBox2.Text) //通过Cron表达式定制时间触发规则, 示例表示从5开始，每隔10秒一次
+                    .Build();
+
+
+                //Job详细描述
+                var jobDetail = JobBuilder.Create<Form1>()
+                    .WithDescription("这是一个测试Job")
+                    .WithIdentity("TestJob", "TestGroup")
+                    .Build();
+
+
+                List<string> receivers= new List<string>();
+                List<string> texts = new List<string>();
+                List<string> images = new List<string>();
+                List<string> files = new List<string>();
+                foreach (var item in this.listBox1.SelectedItems) receivers.Add(item.ToString());
+                foreach (var item in this.listBox4.Items) texts.Add(item.ToString());
+                foreach (var item in this.listBox2.Items) images.Add(item.ToString());
+                foreach (var item in this.listBox3.Items) files.Add(item.ToString());
+
+                jobDetail.JobDataMap.Add("receiver", receivers);
+                jobDetail.JobDataMap.Add("text", texts);
+                jobDetail.JobDataMap.Add("image", images);
+                jobDetail.JobDataMap.Add("file", files);
+
+                //把时间和任务通过载体关联起来
+                scheduler.ScheduleJob(jobDetail, trigger);
+
+                this.button16.Enabled = false;
+                this.button19.Enabled = true;
+            }
+        }
+
+        private void button19_Click(object sender, EventArgs e)
+        {
+            //判断调度是否已经关闭
+            if (!scheduler.InStandbyMode)
+            {
+                scheduler.DeleteJobs(scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup()).Result);
+                //等待任务运行完成
+                scheduler.Standby(); //注意：Shutdown后Start会报错，所以这里使用暂停。
+
+                this.button16.Enabled = true;
+                this.button19.Enabled = false;
+            }
+        }
+
+        public Task Execute(IJobExecutionContext context)
+        {
+            var receivers = context.JobDetail.JobDataMap.Get("receiver") as List<string>;
+            var texts = context.JobDetail.JobDataMap.Get("text") as List<string>;
+            var images = context.JobDetail.JobDataMap.Get("image") as List<string>;
+            var files = context.JobDetail.JobDataMap.Get("file") as List<string>;
+
+            try
+            {
+                PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(en_US, KLF_ACTIVATE));
+                foreach (var receiver in receivers)
+                {
+                    IntPtr maindHwnd = FindWindow("WeChatMainWndForPC", null);
+                    if (maindHwnd != IntPtr.Zero)
+                    {
+                        ShowWindow(maindHwnd, 9);
+                        SetForegroundWindow(maindHwnd);
+                        SetFocus(maindHwnd);
+
+
+                        if (!IsInit)
+                        {
+                            InitWechat();
+                        }
+                        if (wxWindow != null)
+                        {
+                            if (wxWindow.AsWindow().Patterns.Window.PatternOrDefault != null)
+                            {
+                                //将微信窗体设置为默认焦点状态
+                                wxWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(FlaUI.Core.Definitions.WindowVisualState.Normal);
+                            }
+                        }
+
+                        //搜索群===================================================
+                        wxWindow.FindAllDescendants().Where(s => s.Name == "通讯录")?.FirstOrDefault()?.Click();
+                        wxWindow.FindAllDescendants().Where(s => s.Name == "聊天")?.FirstOrDefault()?.Click();
+                        var search = wxWindow.FindAllDescendants().FirstOrDefault(s => s.Name == "搜索");
+                        search.FocusNative();
+                        search.Focus();
+                        search.Click();
+                        System.Threading.Thread.Sleep(1000);
+                        System.Windows.Forms.SendKeys.SendWait(receiver.ToString());
+                        System.Threading.Thread.Sleep(1000);
+
+
+                        var listitem = wxWindow.FindAllDescendants().Where(s => s.ControlType == ControlType.List && s.Name.Contains("@str:IDS_FAV_SEARCH_RESULT")).
+                            FirstOrDefault()?.FindAllDescendants().Where(s => s.ControlType == ControlType.ListItem).FirstOrDefault();
+                        if (listitem == null || listitem.Name != receiver.ToString())
+                        {
+                            continue;
+                        }
+                        System.Threading.Thread.Sleep(1000);
+                        System.Windows.Forms.SendKeys.SendWait("{ENTER}");
+                        RunInSta(() => { Clipboard.Clear(); });
+
+                        var button = wxWindow.FindAllDescendants().Where(s => s.Name == "发送(S)").FirstOrDefault();
+                        if (button == null)
+                        {
+                            continue;
+                        }
+
+                        wxWindow.FindFirstDescendant(x => x.ByControlType(FlaUI.Core.Definitions.ControlType.Text)).Click();
+
+
+                        //发文字===================================================
+                        foreach (var item in texts)
+                        {
+                            if (!string.IsNullOrWhiteSpace(item.ToString()))
+                            {
+                                RunInSta(() => { Clipboard.SetText(item.ToString()); });
+                                System.Threading.Thread.Sleep(1000);
+                                System.Windows.Forms.SendKeys.SendWait("^v");  //发送Ctrl+v 
+                                System.Threading.Thread.Sleep(1000);
+                                SendMessage(maindHwnd, 0x0100, 13, 0);  //回车
+                                System.Threading.Thread.Sleep(1000);
+                                RunInSta(() => { Clipboard.Clear(); });
+                            }
+                        }
+                        //===================================================
+
+
+
+
+                        //发图片===================================================
+                        foreach (var item in images)
+                        {
+                            var image = System.Drawing.Image.FromFile(item.ToString());
+                            RunInSta(() => { Clipboard.SetImage(image); });
+                            System.Threading.Thread.Sleep(1000);
+                            System.Windows.Forms.SendKeys.SendWait("^v");
+                            System.Threading.Thread.Sleep(1000);
+                            SendMessage(maindHwnd, 0x0100, 13, 0);
+                            System.Threading.Thread.Sleep(1000);
+                            RunInSta(() => { Clipboard.Clear(); });
+                        }
+
+                        //===================================================
+
+
+
+                        //发文件===================================================
+                        StringCollection stringCollection = new StringCollection();
+                        foreach (var item in files)
+                        {
+                            stringCollection.Add(item.ToString());
+                        }
+                        if (stringCollection.Count > 0)
+                        {
+                            RunInSta(() => { Clipboard.SetFileDropList(stringCollection); });
+                            System.Threading.Thread.Sleep(1000);
+                            System.Windows.Forms.SendKeys.SendWait("^v");
+                            System.Threading.Thread.Sleep(1000);
+                            SendMessage(maindHwnd, 0x0100, 13, 0);
+                            System.Threading.Thread.Sleep(1000);
+                            RunInSta(() => { Clipboard.Clear(); });
+                        }
+
+                        //===================================================
+
+                    }
+                    else
+                    {
+                        //MessageBox.Show("错误，没有找到微信！");
+                    }
+                }
+                //MessageBox.Show("发送完成", "完成", MessageBoxButtons.OK, MessageBoxIcon.None, MessageBoxDefaultButton.Button1, MessageBoxOptions.ServiceNotification);
+                PostMessage(HWND_BROADCAST, WM_INPUTLANGUANGEREQUEST, IntPtr.Zero, LoadKeyboardLayout(cn_ZH, KLF_ACTIVATE));
+
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public static void RunInSta(Action action)
+        {
+            Thread thread = new Thread(() => action());
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();//Wait for the thread to end
+        }
     }
+
 }

@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="FlaUI.Core" Version="4.0.0" />
     <PackageReference Include="FlaUI.UIA3" Version="4.0.0" />
+    <PackageReference Include="Quartz" Version="3.7.0" />
   </ItemGroup>
 
 </Project>
