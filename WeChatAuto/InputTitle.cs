@@ -26,11 +26,12 @@ namespace WeChatAuto
 
         private void button1_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(this.textBox2.Text))
+            if (string.IsNullOrWhiteSpace(this.textBox2.Text) || string.IsNullOrWhiteSpace(this.textBox1.Text))
             {
                 MessageBox.Show("请输入信息");
                 return;
             }
+
             this.DialogResult = DialogResult.OK;
             this.Close();
         }
